@@ -134,7 +134,7 @@ def train(model, device, train_loader, optimizer, criterion):
 
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        output = model.forward(data)
+        output = model(data)
         loss = criterion(output, target.view(-1))
         loss.backward()
         optimizer.step()
@@ -146,12 +146,12 @@ def train(model, device, train_loader, optimizer, criterion):
 
 def test(model, device, test_loader, criterion, mode='Validation'):
     """Test the model on the validation or test data."""
-
+    model.eval()
     test_losses = []
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            output = model.forward(data)
+            output = model(data)
             test_loss = criterion(output, target.view(-1)).item()
             test_losses.append(test_loss)
            
@@ -205,7 +205,6 @@ def plot_train_validation(model, device, val_loader, train_losses, val_losses, n
     if isinstance(val_predictions, torch.Tensor):
         val_predictions = val_predictions.cpu().numpy()
 
-    print(val_predictions)
 
     model_evaluation(val_labels, val_predictions, 'Model', 'Validation')
 
@@ -215,7 +214,4 @@ def plot_train_validation(model, device, val_loader, train_losses, val_losses, n
     #plot_roc_curve_multi(val_labels, val_predictions, 'Model', 'Validation')
 
         
-        
-
-    
-
+  
