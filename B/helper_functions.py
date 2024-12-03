@@ -1,7 +1,14 @@
 import numpy as np
 import pandas as pd
 import seaborn as sns
+
 import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+from sklearn.metrics import f1_score
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score as accuracy
@@ -56,10 +63,12 @@ def display_incorrect_images(data, labels, predictions, model_name, data_type):
        and display 2 images from each class that were incorrectly predicted."""
 
     fig, ax = plt.subplots(8, 4)
-    fig.suptitle(f"Predictions for {model_name} on {data_type} data\n", fontsize=40)
+    fig.suptitle(f"Predictions for {model_name} on {data_type} data", fontsize=40)
+    fig.text(0.25, 0.95, 'Possible Correct Predictions', ha='center', fontsize=30)
+    fig.text(0.75, 0.95, 'Possible Incorrect Predictions', ha='center', fontsize=30)
     fig.set_size_inches(20, 40)
     plt.subplots_adjust(hspace=0.5, wspace=0.5)
-    plt.subplots_adjust(top=0.95)
+    plt.subplots_adjust(top=0.93)  
     SIZE_SUBPLOT = 20
 
     incorrect_predictions_all = np.where(predictions != labels.T)[1]
@@ -70,20 +79,44 @@ def display_incorrect_images(data, labels, predictions, model_name, data_type):
         incorrect_predictions = [i for i in incorrect_predictions_all if labels[i] == class_label]
         correct_predictions = [i for i in correct_predictions_all if labels[i] == class_label]
 
-        incorrect_predictions = np.random.choice(incorrect_predictions, 2, replace=True)
-        correct_predictions = np.random.choice(correct_predictions, 2, replace=True)
+        try:
+            incorrect_predictions = np.random.choice(incorrect_predictions, 2, replace=True)
+        # Ensures if there are not enough incorrect predictions, it will randomly sample from the correct predictions
+        except:
+            incorrect_predictions = np.random.choice(correct_predictions, 2, replace=True)
 
-        for j, jdx in enumerate(correct_predictions):
-            ax[class_label][j].imshow(data[jdx], cmap='gray')
-            ax[class_label][j].set_title(f"True: {labels[jdx]}\nCorrect Predicted: {predictions[jdx]}", fontsize=SIZE_SUBPLOT)
-            ax[class_label][j].axis('off')
-            ax[class_label][j].set_aspect('auto')
+        try:
+            correct_predictions = np.random.choice(correct_predictions, 2, replace=True)
+        # Ensures if there are not enough correct predictions, it will randomly sample from the incorrect predictions
+        except:
+            correct_predictions = np.random.choice(incorrect_predictions, 2, replace=True)
 
-        for i, idx in enumerate(incorrect_predictions):
-            ax[class_label][i + 2].imshow(data[idx], cmap='gray')
-            ax[class_label][i + 2].set_title(f"True: {labels[idx]}\nIncorrect Predicted: {predictions[idx]}", fontsize=SIZE_SUBPLOT)
-            ax[class_label][i + 2].axis('off')
-            ax[class_label][i + 2].set_aspect('auto')
+        try:
+            for j, jdx in enumerate(correct_predictions):
+                ax[class_label][j].imshow(data[jdx].transpose(1, 2, 0), cmap='gray')
+                ax[class_label][j].set_title(f"True: {labels[jdx]}\nPredicted: {predictions[jdx]}", fontsize=SIZE_SUBPLOT)
+                ax[class_label][j].axis('off')
+                ax[class_label][j].set_aspect('auto')
+        except:
+            for j, jdx in enumerate(correct_predictions):
+                ax[class_label][j].imshow(data[jdx], cmap='gray')
+                ax[class_label][j].set_title(f"True: {labels[jdx]}\nPredicted: {predictions[jdx]}", fontsize=SIZE_SUBPLOT)
+                ax[class_label][j].axis('off')
+                ax[class_label][j].set_aspect('auto')
+
+        try:
+            for i, idx in enumerate(incorrect_predictions):
+                ax[class_label][i + 2].imshow(data[idx].transpose(1, 2, 0), cmap='gray')
+                ax[class_label][i + 2].set_title(f"True: {labels[idx]}\nPredicted: {predictions[idx]}", fontsize=SIZE_SUBPLOT)
+                ax[class_label][i + 2].axis('off')
+                ax[class_label][i + 2].set_aspect('auto')
+        except:
+            for i, idx in enumerate(incorrect_predictions):
+                ax[class_label][i + 2].imshow(data[idx], cmap='gray')
+                ax[class_label][i + 2].set_title(f"True: {labels[idx]}\nPredicted: {predictions[idx]}", fontsize=SIZE_SUBPLOT)
+                ax[class_label][i + 2].axis('off')
+                ax[class_label][i + 2].set_aspect('auto')
+            
 
     #plt.savefig(f"Incorrect Predictions for {model_name} on {data_type} data.png")
 
@@ -129,34 +162,43 @@ def plot_roc_curve_multi(labels, predictions, model_name, data_type):
 
 def train(model, device, train_loader, optimizer, criterion):
     """Train the model on the training data."""
-
+    model.train()
     for data, target in train_loader:
-
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
-        output = model(data)
+        output = model(data).to(device)
         loss = criterion(output, target.view(-1))
         loss.backward()
         optimizer.step()
         loss = loss.item()
 
         return loss
-        
             
 
-def test(model, device, test_loader, criterion, mode='Validation'):
+def test(model, device, test_loader, criterion):
     """Test the model on the validation or test data."""
     model.eval()
     test_losses = []
+    all_labels = []
+    all_predictions = []
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
-            output = model(data)
+            output = model(data).to(device)
             test_loss = criterion(output, target.view(-1)).item()
             test_losses.append(test_loss)
-           
 
-    return np.mean(test_losses)
+            predictions = output.argmax(dim=1, keepdim=True).view(-1).cpu().numpy()
+            labels = target.view(-1).cpu().numpy()
+
+            all_predictions.extend(predictions)
+            all_labels.extend(labels)
+
+        avg_f1_score = f1_score(all_labels, all_predictions, average='weighted')
+        
+
+    return np.mean(test_losses), avg_f1_score
+
             
 
 
@@ -169,16 +211,19 @@ def train_validation(model, device, train_loader, val_loader, optimizer, criteri
     val_losses = []
 
     # Train the model and record the losses
-    for epoch in range(n_epochs):
+    for _ in range(n_epochs):
         train_loss = train(model, device, train_loader, optimizer, criterion)
-        val_loss = test(model, device, val_loader, criterion)    
+        val_loss, f1_score = test(model, device, val_loader, criterion)    
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
 
-    return train_losses, val_losses
+    
 
-def plot_train_validation(model, device, val_loader, train_losses, val_losses, n_epochs=20):
+
+    return train_losses, val_losses, f1_score
+
+def plot_train_validation(model, device, val_loader, train_losses, val_losses, n_epochs):
 
     # Plot the training and validation losses
     plt.figure(figsize=(10, 5))
@@ -194,7 +239,7 @@ def plot_train_validation(model, device, val_loader, train_losses, val_losses, n
     val_data, val_labels = next(iter(val_loader))
     val_data = val_data.to(device)
     val_labels = val_labels.to(device)
-    val_predictions = model.forward(val_data).detach().cpu().numpy()
+    val_predictions = model.forward(val_data, ).detach().cpu().numpy()
     val_predictions = np.argmax(val_predictions, axis=1)
 
     # Check the data type of 
@@ -205,13 +250,33 @@ def plot_train_validation(model, device, val_loader, train_losses, val_losses, n
     if isinstance(val_predictions, torch.Tensor):
         val_predictions = val_predictions.cpu().numpy()
 
-
     model_evaluation(val_labels, val_predictions, 'Model', 'Validation')
 
  
 
-    # Display the ROC curve for the model
-    #plot_roc_curve_multi(val_labels, val_predictions, 'Model', 'Validation')
+
+def test_and_plot(model, device, test_loader):
+
+    # Plot the confusion matrix for the validation data
+    test_data, test_labels = next(iter(test_loader))
+    test_data = test_data.to(device)
+    test_labels = test_labels.to(device)
+    test_pred_prob = model.forward(test_data).detach().cpu().numpy()
+    test_predictions = np.argmax(test_pred_prob, axis=1)
+
+    # Check the data type of 
+    if isinstance(test_data, torch.Tensor):
+        test_data = test_data.cpu().numpy()
+    if isinstance(test_labels, torch.Tensor):
+        test_labels = test_labels.cpu().numpy()
+    if isinstance(test_predictions, torch.Tensor):
+        test_predictions = test_predictions.cpu().numpy()
+
+    model_evaluation(test_labels, test_predictions, 'Model', 'Test')
+
+    plot_roc_curve_multi(test_labels, test_pred_prob, 'Model', 'Test')
+
+    display_incorrect_images(test_data, test_labels, test_predictions, 'Model', 'Test')
 
         
-  
+
