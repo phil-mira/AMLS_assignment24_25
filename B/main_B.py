@@ -227,10 +227,10 @@ if tuning == True:
                               c2}, fc1_out={f1}, lr={lr}, f1_score={f1_score}')
 
 else:
-    conv1_out = 128
+    conv1_out = 32
     conv2_out = 128
-    fc1_out = 1024
-    best_lr = 0.01
+    fc1_out = 512
+    best_lr = 0.001
     best_model = BloodMnistCNN(
         conv1_out=conv1_out, conv2_out=conv2_out, fc1_out=fc1_out).to(device)
 
