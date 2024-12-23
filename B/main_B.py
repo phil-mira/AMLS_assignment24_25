@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import f1_score
@@ -24,7 +25,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Set the parameters for whether to perform hyperparameter tuning and validation
 tuning = False
-validation = False
+base = False
 
 dfile = '../Datasets/bloodmnist.npz'
 if not os.path.exists(dfile):
@@ -43,6 +44,12 @@ bloodmnist_val_labels = data_bloodmnist['val_labels']
 
 bloodmnist_test_images = data_bloodmnist['test_images']
 bloodmnist_test_labels = data_bloodmnist['test_labels']
+
+# Flatten the target labels
+# Flatten the target labels
+bloodmnist_train_labels = bloodmnist_train_labels.ravel()
+bloodmnist_val_labels = bloodmnist_val_labels.ravel()
+bloodmnist_test_labels = bloodmnist_test_labels.ravel()
 
 # Summary statistics of the labels
 unique, counts = np.unique(bloodmnist_train_labels, return_counts=True)
@@ -79,80 +86,74 @@ bloodmnist_val_images = bloodmnist_val_images / 255.0
 bloodmnist_test_images = bloodmnist_test_images / 255.0
 
 
-C_regularization = 10
-gamma = 0.01
+if base == True:
+    # Define file path for the SVC model
+    svc_model_path = 'Models/svc_model.pkl'
+
+    # Check if the SVC model exists
+    if os.path.exists(svc_model_path):
+        with open(svc_model_path, 'rb') as file:
+            svc = pickle.load(file)
+    else:
+        svc = SVC(kernel='linear')
+        svc.fit(bloodmnist_train_labels, bloodmnist_train_images)
+        with open(svc_model_path, 'wb') as file:
+            pickle.dump(svc, file)
+    svc_predictions = svc.predict(bloodmnist_train_images)
+    model_evaluation(bloodmnist_train_labels,
+                     svc_predictions, 'SVC with linear kernel', 'Validation')
+
+# Tune the SVC model by using different kernels, gamma and C values
+best_params = {}
+best_C = 10
+best_gamma = 0.1
+best_kernel = 'rbf'
+
+# Define file path for the tuned SVC model
+svc_model_tuned_path = f'Models/svc_model_tuned.pkl'
 if tuning == True:
 
-    # Train the model on various kernels
-    svc_linear = SVC(kernel='linear')
-    svc_poly = SVC(kernel='poly')
-    svc_rbf = SVC(kernel='rbf')
-    svc_sigmoid = SVC(kernel='sigmoid')
-
-    kernels = {'Linear': [svc_linear], 'Poly': [svc_poly],
-               'RBF': [svc_rbf], 'Sigmoid': [svc_sigmoid]}
-
-    for n in kernels:
-        model_filename = f'models/svc_{n.lower()}.pkl'
-        if os.path.exists(model_filename):
-            with open(model_filename, 'rb') as file:
-                model = pickle.load(file)
-        else:
-            model = kernels[n][0]
-            model.fit(bloodmnist_train_images, bloodmnist_train_labels)
-            with open(model_filename, 'wb') as file:
-                pickle.dump(model, file)
-        kernels[n].append(model.predict(bloodmnist_val_images))
-
-    for n in kernels:
-        model_evaluation(bloodmnist_val_labels, kernels[n][1], f'SVC with {
-                         n} kernel', 'Validation')
-
-    param_grid = {'C': [0.1, 1, 10,], 'gamma': [0.01, 0.001]}
-
-    grid = GridSearchCV(SVC(kernel='rbf'), param_grid,
-                        refit=True, verbose=2, scoring='f1_weighted')
+    param_grid = {
+        'C': [0.1, 1, 10, 30],
+        'gamma': [0.01, 0.1, 1],
+        'kernel': ['linear', 'poly', 'rbf', 'sigmoid']
+    }
+    grid = GridSearchCV(SVC(), param_grid, scoring='f1_weighted')
     grid.fit(bloodmnist_train_images, bloodmnist_train_labels)
+    best_C = grid.best_params_['C']
+    best_gamma = grid.best_params_['gamma']
+    best_kernel = grid.best_params_['kernel']
+    print(f'Best parameters: {grid.best_params_}')
+    model_evaluation(bloodmnist_train_labels, grid.predict(bloodmnist_train_images),
+                     f'SVC (Tuned)', 'Validation')
+    # Save the model
+    with open(svc_model_tuned_path, 'wb') as file:
+        pickle.dump(grid.best_estimator_, file)
 
-    C_regularization = grid.best_params_['C']
-    gamma = grid.best_params_['gamma']
-
-
-model_filename = 'models/svc_rbf_tuned.pkl'
-if os.path.exists(model_filename):
-    with open(model_filename, 'rb') as file:
-        svc_rbf_tuned = pickle.load(file)
+# Check if the SVC model with the best kernel exists
+if os.path.exists(svc_model_tuned_path):
+    with open(svc_model_tuned_path, 'rb') as file:
+        svc = pickle.load(file)
 else:
-    svc_rbf_tuned = SVC(kernel='rbf', C=C_regularization,
-                        gamma=gamma, probability=True)
-    svc_rbf_tuned.fit(bloodmnist_train_images, bloodmnist_train_labels)
-    with open(model_filename, 'wb') as file:
-        pickle.dump(svc_rbf_tuned, file)
+    svc = SVC(kernel=best_kernel, C=best_C,  probability=True)
+    svc.fit(bloodmnist_train_images, bloodmnist_train_labels)
+    with open(svc_model_tuned_path, 'wb') as file:
+        pickle.dump(svc, file)
 
-if validation == True:
-    # Predict the probabilities of the validation set
-    svc_rbf_tuned_pred_val = svc_rbf_tuned.predict(bloodmnist_val_images)
-
-    svc_rbf_tuned_pred_val_prob = svc_rbf_tuned.predict_proba(
-        bloodmnist_val_images)
-
-    model_evaluation(bloodmnist_val_labels, svc_rbf_tuned_pred_val,
-                     'SVC with RBF kernel (Tuned)', 'Validation')
-    plot_roc_curve_multi(bloodmnist_val_labels, svc_rbf_tuned_pred_val_prob,
-                         'SVC with RBF kernel (Tuned)', 'Validation')
-    display_incorrect_images(data_bloodmnist['val_images'], bloodmnist_val_labels,
-                             svc_rbf_tuned_pred_val, 'SVC with RBF kernel (Tuned)', 'Validation')
+svc_tuned_val = svc.predict(bloodmnist_val_images)
+model_evaluation(bloodmnist_val_labels, svc_tuned_val,
+                 'SVC (Tuned)', 'Validation')
 
 
-svc_rbf_tuned_test = svc_rbf_tuned.predict(bloodmnist_test_images)
-svc_rbf_tuned_test_prob = svc_rbf_tuned.predict_proba(bloodmnist_test_images)
+svc_tuned_test = svc.predict(bloodmnist_test_images)
+svc_tuned_test_prob = svc.predict_proba(bloodmnist_test_images)
 
-model_evaluation(bloodmnist_test_labels, svc_rbf_tuned_test,
-                 'SVC with RBF kernel (Tuned)', 'Test')
-plot_roc_curve_multi(bloodmnist_test_labels, svc_rbf_tuned_test_prob,
-                     'SVC with RBF kernel (Tuned)', 'Test')
+model_evaluation(bloodmnist_test_labels, svc_tuned_test,
+                 'SVC (Tuned)', 'Test')
+plot_roc_curve_multi(bloodmnist_test_labels, svc_tuned_test_prob,
+                     'SVC (Tuned)', 'Test')
 display_incorrect_images(data_bloodmnist['test_images'], bloodmnist_test_labels,
-                         svc_rbf_tuned_test, 'SVC with RBF kernel (Tuned)', 'Test')
+                         svc_tuned_test, 'SVC (Tuned)', 'Test')
 
 
 # Define the transformations
@@ -182,13 +183,14 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 num_epochs = 500
 
-if validation == True:
+if base == True:
     # Initialize lists to store training and validation losses
     train_losses, val_losses, _ = train_validation(
         model, device, train_loader, val_loader, optimizer, criterion, num_epochs)
     plot_train_validation(model, device, val_loader,
                           train_losses, val_losses, num_epochs)
 
+model_filename = 'models/best_CNN_model.pth'
 if tuning == True:
     # Manually tune the hyperparameters of the CNN model
     # Define the hyperparameters
@@ -226,6 +228,10 @@ if tuning == True:
                         print(f'Current Best model found with conv1_out={c1}, conv2_out={
                               c2}, fc1_out={f1}, lr={lr}, f1_score={f1_score}')
 
+    # Save the best model
+    torch.save(best_model.state_dict(), model_filename)
+
+
 else:
     conv1_out = 32
     conv2_out = 128
@@ -234,13 +240,21 @@ else:
     best_model = BloodMnistCNN(
         conv1_out=conv1_out, conv2_out=conv2_out, fc1_out=fc1_out).to(device)
 
-
 model = best_model
 optimizer = optim.Adam(model.parameters(), lr=best_lr)
 criterion = nn.CrossEntropyLoss()
 num_epochs = 1500
 
-if validation == True:
+# Check if the model exists
+if os.path.exists(model_filename):
+    model.load_state_dict(torch.load(model_filename, weights_only=True))
+    model.to(device)
+else:
+    # Train the model
+    for _ in range(num_epochs):
+        train_loss, model = train(
+            model, device, train_loader, optimizer, criterion)
+    torch.save(model.state_dict(), model_filename)
     # Train and validate the model
     train_losses, val_losses, f1_score = train_validation(
         model, device, train_loader, val_loader, optimizer, criterion, num_epochs)
@@ -248,19 +262,6 @@ if validation == True:
     # Plot the results
     plot_train_validation(model, device, val_loader,
                           train_losses, val_losses, num_epochs)
-else:
-    # Check if the model exists
-    model_filename = 'models/best_CNN_model.pth'
-    print("Checkpoint: CNN Best")
-    if os.path.exists(model_filename):
-        model.load_state_dict(torch.load(model_filename, weights_only=True))
-        model.to(device)
-    else:
-        # Train the model
-        for _ in range(num_epochs):
-            train_loss, model = train(
-                model, device, train_loader, optimizer, criterion)
-        torch.save(model.state_dict(), model_filename)
 
 
 test_and_plot(model, device, test_loader)

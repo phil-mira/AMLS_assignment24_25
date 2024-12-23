@@ -29,7 +29,7 @@ def model_evaluation(labels, predictions, model_name, dataset_type):
                 dataset_type} data:\n{report}')
 
     fig, ax = plt.subplots(figsize=(10, 10))
-    TITLE_FONT_SIZE = {"size": "40"}
+    TITLE_FONT_SIZE = {"size": "20"}
     LABEL_FONT_SIZE = {"size": "40"}
     LABEL_SIZE = 20
 
@@ -52,7 +52,7 @@ def model_evaluation(labels, predictions, model_name, dataset_type):
                 'size': 10}, fmt='', cmap='Blues', vmax=1.0, vmin=0.0)
 
     # Titles, axis labels, etc.
-    title = f"Confusion Matrix for {model_name}\n({dataset_type} data)\n"
+    title = f"Confusion Matrix for {model_name}\n({dataset_type} data)"
     cbar = ax.collections[0].colorbar
     cbar.set_ticks([0, 0.25, 0.5, 0.75, 1])
     cbar.set_ticklabels(['0%', '25%', '50%', '75%', '100%'])
@@ -72,19 +72,15 @@ def display_incorrect_images(data, labels, predictions, model_name, data_type):
        and display 2 images from each class that were incorrectly predicted."""
 
     fig, ax = plt.subplots(8, 4)
-    fig.suptitle(f"Predictions for {model_name} on {
-                 data_type} data", fontsize=40)
-    fig.text(0.25, 0.95, 'Possible Correct Predictions',
-             ha='center', fontsize=30)
-    fig.text(0.75, 0.95, 'Possible Incorrect Predictions',
-             ha='center', fontsize=30)
+    fig.suptitle(f'Predictions for {model_name} on '
+                 f'{data_type} data', fontsize=40)
     fig.set_size_inches(20, 40)
     plt.subplots_adjust(hspace=0.5, wspace=0.5)
     plt.subplots_adjust(top=0.93)
-    SIZE_SUBPLOT = 20
+    SIZE_SUBPLOT = 30
 
-    incorrect_predictions_all = np.where(predictions != labels.T)[1]
-    correct_predictions_all = np.where(predictions == labels.T)[1]
+    incorrect_predictions_all = np.where(predictions != labels)[0]
+    correct_predictions_all = np.where(predictions == labels)[0]
 
     for class_label in range(8):
 
@@ -179,8 +175,8 @@ def plot_roc_curve_multi(labels, predictions, model_name, data_type):
     ax.set_ylim([0.0, 1.0])
     ax.set_xlabel('False Positive Rate', fontdict=LABEL_FONT_SIZE)
     ax.set_ylabel('True Positive Rate', fontdict=LABEL_FONT_SIZE)
-    ax.set_title(f'ROC Curve for {model_name} on {
-                 data_type} data \n', fontdict=TITLE_FONT_SIZE)
+    ax.set_title(f'ROC Curve for {model_name}\n'
+                 f'{data_type} data', fontdict=TITLE_FONT_SIZE)
     ax.legend(loc="lower right")
     ax.tick_params(axis="both", which="major", labelsize=LABEL_SIZE)
     plt.savefig(f"Figures/ROC Curve for {model_name} on {data_type} data.png")
@@ -295,7 +291,7 @@ def plot_train_validation(model, device, val_loader, train_losses, val_losses, n
     if isinstance(val_predictions, torch.Tensor):
         val_predictions = val_predictions.cpu().numpy()
 
-    model_evaluation(val_labels, val_predictions, 'Model', 'Validation')
+    model_evaluation(val_labels, val_predictions, 'CNN', 'Validation')
 
 
 def test_and_plot(model, device, test_loader):
@@ -315,12 +311,12 @@ def test_and_plot(model, device, test_loader):
     if isinstance(test_predictions, torch.Tensor):
         test_predictions = test_predictions.cpu().numpy()
 
-    model_evaluation(test_labels, test_predictions, 'Model', 'Test')
+    model_evaluation(test_labels, test_predictions, 'CNN (Tuned)', 'Test')
 
-    plot_roc_curve_multi(test_labels, test_pred_prob, 'Model', 'Test')
+    plot_roc_curve_multi(test_labels, test_pred_prob, 'CNN (Tuned)', 'Test')
 
     display_incorrect_images(test_data, test_labels,
-                             test_predictions, 'Model', 'Test')
+                             test_predictions, 'CNN (Tuned)', 'Test')
 
 
 class BloodMnistCNN(nn.Module):
