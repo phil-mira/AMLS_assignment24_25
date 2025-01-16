@@ -46,7 +46,6 @@ bloodmnist_test_images = data_bloodmnist['test_images']
 bloodmnist_test_labels = data_bloodmnist['test_labels']
 
 # Flatten the target labels
-# Flatten the target labels
 bloodmnist_train_labels = bloodmnist_train_labels.ravel()
 bloodmnist_val_labels = bloodmnist_val_labels.ravel()
 bloodmnist_test_labels = bloodmnist_test_labels.ravel()
