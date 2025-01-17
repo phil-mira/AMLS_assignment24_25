@@ -73,7 +73,7 @@ The repository includes pre-trained models in the following locations:
 - `folder_A/models/`: Contains tuned models for implementation A
 - `folder_B/models/`: Contains tuned models for implementation B
 
-These models have been optimized using [describe optimization process/metrics] and are ready for immediate use.
+These models have been optimized using grid search and are ready for immediate use.
 
 
 ## Requirements
