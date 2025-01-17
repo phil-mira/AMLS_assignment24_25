@@ -35,7 +35,7 @@ cd [project-directory]
 2. Create and activate the conda environment:
 ```bash
 conda env create -f environment.yml
-conda activate aml-systems
+conda activate MLS_1
 ```
 
 ## Usage
