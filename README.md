@@ -1,6 +1,6 @@
 # Applied Machine Learning Systems Project
 
-This repository contains the implementation of machine learning models as part of the coursework for the Applied Machine Learning Systems project. The project is structured with separate modules for different model implementations, with pre-tuned models provided and the option to perform new tuning and validation. As required, folder A contains all modules and 
+This repository contains the implementation of machine learning models as part of the coursework for the Applied Machine Learning Systems project. The project is structured with separate modules for different model implementations, with pre-tuned models provided and the option to perform new tuning and validation. Please note the file system was changed to include the correct folders after the deadline to allow for reproducibility due to confusion in project description, no changes were made to the underlying code, just folders for figures and reports were added.
 
 ## Project Structure
 
